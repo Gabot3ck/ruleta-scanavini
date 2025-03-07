@@ -1,6 +1,7 @@
 :root{
 	--roulette-color-1: #6f6f6f;
 	--roulette-color-2: #FF671D;
+    --color-secondary: rgb(0, 132, 255);
 }
 * {
     margin: 0;
@@ -47,18 +48,6 @@ body main {
 
 .button-container button:active {
     background: #1781ec
-}
-#arrow {
-    position: absolute;
-    bottom: 260px;
-    left: -50px;
-    width: 90px;
-    z-index: 110;
-    transform: rotate(224deg); ;
-    -webkit-transform: rotate(224deg);
-    -moz-transform: rotate(224deg);
-    -ms-transform: rotate(224deg);
-    -o-transform: rotate(224deg);
 }
 
 /****?  ROULETTE.CSS ****/
@@ -260,6 +249,17 @@ main .roulette-container {
     -o-transform: rotate(330deg) skewY(-60deg);
 }
 
+/****?  ROULETTE-ARROW.CSS ****/
+#arrow {
+    position: absolute;
+    top: 60px;
+    left: 170px;
+    width: 60px;
+    z-index: 110;
+    color:var(--color-secondary) ;
+}
+
+
 /****?  ROULETTE-LOGO.CSS ****/
 #logo{
     position: relative;
@@ -275,3 +275,6 @@ main .roulette-container {
     border-radius: 50%;
     box-shadow: 0 0 10px rgba(0,0,0,0.5);
 }
+
+
+/****? MODAL ****/
