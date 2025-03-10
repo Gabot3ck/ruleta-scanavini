@@ -1,0 +1,149 @@
+/*? Hacer que la ruleta sea interactiva */
+/* #roulette {
+    cursor: grab;
+    transition: transform 0.2s;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    touch-action: manipulation;
+    will-change: transform;
+} */
+
+/* #roulette:active {
+    cursor: grabbing;
+} */
+
+/* Eliminar el botón de reset */
+#reset {
+    display: none !important;
+}
+
+/* Añadir sombra dinámica durante la interacción */
+/* #roulette.dragging {
+    box-shadow: 0 0 35px rgba(255, 103, 29, 0.6);
+} */
+
+/* Efecto de "rebote" cuando la ruleta está en reposo */
+/* #roulette:not(.dragging):not(.spinning) {
+    animation: gentle-bounce 3s infinite ease-in-out;
+} */
+
+@keyframes gentle-bounce {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(1deg); }
+}
+
+/* Borde luminoso al arrastrar */
+/* #roulette.dragging {
+    border-color: #FF671D;
+} */
+
+/* Efecto sutil para sugerir interactividad */
+#roulette::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle, transparent 60%, rgba(255, 255, 255, 0.1) 100%);
+    opacity: 0;
+    transition: opacity 0.3s;
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+#roulette:hover::after {
+    opacity: 1;
+}
+
+/* Icono indicador de arrastre */
+/* .drag-hint {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.5rem;
+    color: rgba(255, 255, 255, 0.8);
+    background-color: rgba(0, 0, 0, 0.5);
+    padding: 10px 20px;
+    border-radius: 30px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s;
+    z-index: 200;
+}
+
+.roulette-container:hover .drag-hint {
+    opacity: 1;
+} */
+
+/* Animación para la flecha */
+/* #arrow {
+    filter: drop-shadow(0 0 5px rgba(255, 103, 29, 0.7));
+    transition: filter 0.3s;
+} */
+
+/* #roulette.spinning + #arrow {
+    filter: drop-shadow(0 0 10px rgba(255, 103, 29, 1));
+} */
+
+/* Centrar correctamente el logo y darle efecto de profundidad */
+/* #logo {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 100;
+    width: 80px;
+    height: 80px;
+    background: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5),
+                inset 0 0 10px rgba(0, 0, 0, 0.2);
+    border: 5px solid #FF671D;
+} */
+
+/* Mejorar la apariencia del botón de giro */
+/* #spin {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(to right, #FF671D, #ff8a00);
+    border-radius: 50px;
+    box-shadow: 0 5px 15px rgba(255, 103, 29, 0.4);
+    transition: all 0.3s;
+}
+
+#spin:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(255, 103, 29, 0.6);
+}
+
+#spin:active {
+    transform: translateY(1px);
+    box-shadow: 0 3px 10px rgba(255, 103, 29, 0.3);
+} */
+
+/* Efecto de onda al hacer clic en el botón */
+#spin::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    background: rgba(255, 255, 255, 0.8);
+    opacity: 0;
+    border-radius: 50%;
+    transform: scale(1);
+    transition: opacity 0.4s, transform 0.8s;
+}
+
+#spin:active::after {
+    opacity: 1;
+    transform: scale(30);
+}

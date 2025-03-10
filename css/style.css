@@ -17,12 +17,13 @@ body {
     background: whitesmoke;
     font-family: Arial, Helvetica, sans-serif;
 }
-body main {
+main {
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     width: 100%;
+    min-height: 100vh;
 }
 
 
@@ -32,22 +33,40 @@ body main {
 }
 
 .button-container button {
+    position: relative;
     border: none;
-    outline: none;
+    border-radius: 50px;
     padding: 15px 100px;
-    background: #2287ed;
     color: #fff;
     font-size: 25px;
     font-weight: bold;
     cursor: pointer;
+    outline: none;
+    overflow: hidden;
+    background: linear-gradient(to right, #FF671D, #ff8a00);
+    box-shadow: 0 5px 15px rgba(255, 103, 29, 0.4);
+    transition: all 0.3s;
 }
 
 .button-container button:hover {
-    background: #2889ea;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(255, 103, 29, 0.6);
 }
 
 .button-container button:active {
-    background: #1781ec
+    transform: translateY(1px);
+    box-shadow: 0 3px 10px rgba(255, 103, 29, 0.3);
+}
+
+/*****? LOGO SCANAVINI */
+.container-scanavini{
+    height: 100px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.container-scanavini img{
+    height: inherit;
 }
 
 /****?  ROULETTE.CSS ****/
@@ -62,13 +81,41 @@ main .roulette-container {
     font-size: 14px;
     overflow: hidden;
     border-radius: 100%;
-    transition-property: transform;
+    transition-property: transform 0.2s;
     transform: rotate(0deg);
     -webkit-transform: rotate(0deg);
     -moz-transform: rotate(0deg);
     -ms-transform: rotate(0deg);
     -o-transform: rotate(0deg);
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    touch-action: manipulation;
+    will-change: transform;
 }
+#roulette:active {
+    cursor: grabbing;
+}
+/* Añadir sombra dinámica durante la interacción */
+#roulette.dragging {
+    box-shadow: 0 0 35px rgba(255, 103, 29, 0.6);
+}
+
+/* Efecto de "rebote" cuando la ruleta está en reposo */
+#roulette:not(.dragging):not(.spinning) {
+    animation: gentle-bounce 3s infinite ease-in-out;
+}
+/* Borde luminoso al arrastrar */
+#roulette.dragging {
+    border-color: #ff9058;
+}
+
+#roulette.spinning + #arrow {
+    filter: drop-shadow(0 0 10px rgba(255, 103, 29, 1));
+}
+
 
 #roulette .roulette-section {
     position: absolute;
@@ -97,7 +144,8 @@ main .roulette-container {
 }
 
 #roulette .roulette-section .roulette-section-container p {
-    margin-top: 30px;
+    margin-top: 5px;
+    font-weight: 600;
     transform: rotate(90deg);
     -webkit-transform: rotate(90deg);
     -moz-transform: rotate(90deg);
@@ -105,13 +153,11 @@ main .roulette-container {
     -o-transform: rotate(90deg);
 }
 
+
 .button-container {
     margin-top: 50px;
 }
 
-.button-container button#reset {
-    display: none;
-}
 
 /****?  ROULETTE-COLORS.CSS ****/
 #roulette .roulette-section:first-child .roulette-section-container {
@@ -257,6 +303,31 @@ main .roulette-container {
     width: 60px;
     z-index: 110;
     color:var(--color-secondary) ;
+    filter: drop-shadow(0 0 5px rgba(255, 103, 29, 0.7));
+    transition: filter 0.3s;
+}
+#roulette.spinning + #arrow {
+    filter: drop-shadow(0 0 10px rgba(255, 103, 29, 1));
+}
+/* Icono indicador de arrastre */
+.drag-hint {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.5rem;
+    color: rgba(255, 255, 255, 0.8);
+    background-color: rgba(0, 0, 0, 0.5);
+    padding: 10px 20px;
+    border-radius: 30px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s;
+    z-index: 200;
+}
+
+.roulette-container:hover .drag-hint {
+    opacity: 1;
 }
 
 
@@ -266,6 +337,7 @@ main .roulette-container {
     top: 43%;
     z-index: 100;
     margin: 0 auto 20px;
+    border: 5px solid #FF671D;
     width: 70px;
     height: 70px;
     display: flex;
@@ -273,8 +345,69 @@ main .roulette-container {
     align-items: center;
     background-color: white;
     border-radius: 50%;
-    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5),
+                inset 0 0 10px rgba(0, 0, 0, 0.2);
 }
 
 
-/****? MODAL ****/
+/****? MODAL OF RESULT****/
+/* Estilos para el modal */
+.winner-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+}
+
+.winner-modal-content {
+    background-color: white;
+    padding: 30px;
+    border-radius: 10px;
+    text-align: center;
+    position: relative;
+    width: 80%;
+    max-width: 400px;
+    animation: modalAppear 0.5s ease-out forwards;
+}
+.winner-title {
+    font-size: 30px;
+    font-weight: bold;
+    color: var(--roulette-color-2);
+    margin-bottom: 20px;
+}
+.winner-message{
+    font-size: 20px;
+}
+
+/****? MODAL OF WARNING****/
+.drag-indicator{
+    z-index: 200;
+    text-align: center;
+    
+}
+/* Indicador visual de arrastre */
+.drag-indicator {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 200;
+    transform: translate(-50%, -50%);
+    font-size: 24px;
+    font-weight: 500;
+    color: #333;
+    background-color: rgb(255, 255, 255);
+    padding: 15px;
+    border-radius: 10px;
+    opacity: 0;
+    font-size: 20px;
+    transition: opacity 0.3s;
+    pointer-events: none;
+}
+
+

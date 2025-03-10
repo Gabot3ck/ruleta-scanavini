@@ -1,12 +1,17 @@
 // Selección de elementos del DOM
 const roulette = document.querySelector("#roulette");
 const spinButton = document.querySelector("#spin");
-const resetButton = document.querySelector("#reset");
 const arrow = document.querySelector("#arrow");
+
+// Ocultar el botón de reset ya que lo eliminaremos de la funcionalidad
+const resetButton = document.querySelector("#reset");
+if (resetButton) {
+    resetButton.style.display = "none";
+}
 
 // Configuración básica
 const maxSpins = 10;
-const minSpins = 4; // Aumentado para garantizar un giro más prolongado
+const minSpins = 5;
 const maxDegrees = 360;
 const minDegrees = 1;
 
@@ -14,22 +19,38 @@ const minDegrees = 1;
 const sections = document.querySelectorAll('.roulette-section');
 const sectionAngle = 360 / sections.length;
 
+// Variables para el sistema de arrastre
+let isDragging = false;
+let startAngle = 0;
+let currentRotation = 0;
+let startRotation = 0;
+let dragSpeed = 0;
+let lastDragTime = 0;
+let lastDragAngle = 0;
+let dragSamples = [];
+const maxSamples = 5; // Número de muestras para calcular la velocidad
+
+// Estado para controlar si la ruleta está girando
+let isSpinning = false;
+
 // Obtener un número aleatorio entre un mínimo y un máximo
 const getRandomNumber = (min, max) => {
     return Math.round(Math.random() * (max - min) + min);
 };
 
-// Función para hacer "trampa" y seleccionar un premio específico
-const selectPrize = (prizeIndex) => {
-    // Calculamos el ángulo necesario para que la flecha apunte al premio
-    // El +0.5 es para apuntar al centro de la sección
-    const targetAngle = (prizeIndex + 0.5) * sectionAngle;
-    
-    // Calculamos la rotación necesaria (sumamos giros completos para el efecto)
-    const spins = getRandomNumber(minSpins, maxSpins);
-    const spin = (spins * 360) + (360 - targetAngle);
-    
-    return spin;
+// Función para convertir grados a radianes
+const toRadians = (degrees) => {
+    return degrees * (Math.PI / 180);
+};
+
+// Función para convertir radianes a grados
+const toDegrees = (radians) => {
+    return radians * (180 / Math.PI);
+};
+
+// Función para calcular el ángulo entre dos puntos con respecto al centro
+const calculateAngle = (centerX, centerY, pointX, pointY) => {
+    return toDegrees(Math.atan2(pointY - centerY, pointX - centerX));
 };
 
 // Detectar el premio ganador después de girar
@@ -52,8 +73,9 @@ const determineWinner = (finalRotation) => {
 
 // Agregar efectos de sonido
 const addSoundEffects = () => {
-    const tickingSound = new Audio('../sounds/ticking-sound.mp3');
+    const tickingSound = new Audio('../sounds/ticking-sound.mp3'); 
     const finishSound = new Audio('../sounds/finish-sound.mp3');
+    const lostSound = new Audio('../sounds/lost-sound.mp3');
     
     return {
         playTicking: () => {
@@ -68,6 +90,10 @@ const addSoundEffects = () => {
         playFinish: () => {
             finishSound.currentTime = 0;
             finishSound.play().catch(e => console.log("Error al reproducir sonido:", e));
+        },
+        playLosing: () => {
+            lostSound.currentTime = 0;
+            lostSound.play().catch(e => console.log("Error al reproducir sonido:", e));
         }
     };
 };
@@ -77,9 +103,6 @@ const sounds = addSoundEffects();
 
 // Función para mostrar confeti cuando se determina un ganador
 const showConfetti = () => {
-    // Aquí puedes implementar la animación de confeti con canvas
-    // Por ahora, usaremos un ejemplo simple con divs
-    
     const confettiContainer = document.createElement('div');
     confettiContainer.className = 'confetti-container';
     document.body.appendChild(confettiContainer);
@@ -108,6 +131,7 @@ const showConfetti = () => {
 
 // Crear un modal para mostrar el premio ganador
 const createWinnerModal = (prizeName) => {
+
     const modal = document.createElement('div');
     modal.className = 'winner-modal';
     
@@ -120,10 +144,21 @@ const createWinnerModal = (prizeName) => {
     closeButton.onclick = () => modal.remove();
     
     const title = document.createElement('h2');
-    title.textContent = '¡Felicidades!';
-    
     const message = document.createElement('p');
-    message.textContent = `Has ganado: ${prizeName}`;
+    title.className = 'winner-title';
+    message.className = 'winner-message';
+
+    if( prizeName !== 'Siga participando' ){
+        title.textContent = '¡Felicidades!';
+        ( prizeName === 'Huincha' || prizeName === 'Sorpresa' ) 
+        ? message.innerHTML = `Has ganado una: <strong>${prizeName}</strong>`
+        : message.innerHTML = `Has ganado un: <strong>${prizeName}</strong>`;
+        
+    } else {
+        title.innerHTML = '¡Suerte para la próxima!';
+        message.innerHTML = `<strong>${prizeName}</strong>`;
+    }
+    
     
     modalContent.appendChild(closeButton);
     modalContent.appendChild(title);
@@ -140,39 +175,41 @@ const createWinnerModal = (prizeName) => {
     };
 };
 
-// Estado para controlar si la ruleta está girando
-let isSpinning = false;
-
-// Evento para girar la ruleta
-spinButton.addEventListener("click", () => {
-    // Evitar múltiples clics mientras gira
+// Función para iniciar el giro con una velocidad dada (basada en el arrastre)
+const spinWithDragSpeed = (speed) => {
     if (isSpinning) return;
     isSpinning = true;
     
-    // Ocultar el botón de girar y mostrar el de reset
-    spinButton.style.display = "none";
-    resetButton.style.display = "inline-block";
+    // Asegurarse de que la velocidad tenga un mínimo
+    let actualSpeed = Math.abs(speed);
+    if (actualSpeed < 200) actualSpeed = 200;
     
-    // Determinar la rotación (aleatoria o controlada)
-    // Para hacer "trampa" y seleccionar un premio específico, descomenta la siguiente línea:
-    // const spin = selectPrize(2); // Elige el tercer premio (índice 2)
+    // Calcular un número de giros basado en la velocidad
+    const spinsBase = Math.min(Math.max(actualSpeed / 100, minSpins), maxSpins);
+    const spins = spinsBase + getRandomNumber(0, 2); // Añade algo de aleatoriedad
     
-    // Para una rotación totalmente aleatoria:
-    const spins = getRandomNumber(minSpins, maxSpins);
+    // Calcular grados adicionales
     const degrees = getRandomNumber(minDegrees, maxDegrees);
-    const fullSpins = spins * 360;
-    const spin = fullSpins + degrees;
     
-    // Calcular el tiempo de animación basado en la cantidad de giros
-    const animationTime = spins * 0.5 + 1; // Tiempo base + tiempo por giro
+    // Determinar la dirección basada en el signo de la velocidad
+    const direction = speed >= 0 ? 1 : -1;
+    
+    // Calcular la rotación total
+    const fullSpins = spins * 360 * direction;
+    const spin = currentRotation + fullSpins + (degrees * direction);
+    
+    // Actualizar la rotación actual
+    currentRotation = spin;
+    
+    // Calcular el tiempo de animación basado en la velocidad
+    const animationTime = Math.min(Math.max(spins * 0.5, 3), 8); // Entre 3 y 8 segundos
     
     // Reproducir sonido de ticking
     sounds.playTicking();
     
     // Animar la ruleta
+    roulette.style.transition = `transform ${animationTime}s cubic-bezier(0.1, 0.7, 0.1, 1)`;
     roulette.style.transform = `rotate(${spin}deg)`;
-    roulette.style.transitionDuration = `${animationTime}s`;
-    roulette.style.transitionTimingFunction = "cubic-bezier(0.1, 0.7, 0.1, 1)"; // Efecto de desaceleración
     
     // Sacudir ligeramente la flecha para efecto visual
     const shakeArrow = () => {
@@ -189,7 +226,7 @@ spinButton.addEventListener("click", () => {
     setTimeout(() => {
         // Detener el sonido de ticking y reproducir el sonido de finalización
         sounds.stopTicking();
-        sounds.playFinish();
+        
         
         // Detener la sacudida de la flecha
         clearInterval(shakeInterval);
@@ -197,8 +234,196 @@ spinButton.addEventListener("click", () => {
         // Determinar el premio ganador
         const prizeName = determineWinner(spin);
         
-        // Mostrar confeti
-        showConfetti();
+        if (prizeName !== 'Siga participando') {
+            // Mostrar confeti
+            showConfetti();
+            // sonido de premiado
+            sounds.playFinish();
+        } else {
+            // sonido de derrota
+            sounds.playLosing();
+        }
+        
+        // Mostrar modal con el premio
+        setTimeout(() => {
+            createWinnerModal(prizeName);
+            isSpinning = false;
+        }, 1000);
+        
+    }, animationTime * 1000);
+};
+
+// Inicializar eventos para el arrastre
+const initDragEvents = () => {
+    // Obtener el centro de la ruleta
+    const rouletteRect = roulette.getBoundingClientRect();
+    const centerX = rouletteRect.left + rouletteRect.width / 2;
+    const centerY = rouletteRect.top + rouletteRect.height / 2;
+    
+    // Función para manejar el inicio del arrastre
+    const handleDragStart = (e) => {
+        if (isSpinning) return;
+        
+        // Obtener las coordenadas del evento (táctil o ratón)
+        const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+        const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+        
+        if (clientX === undefined || clientY === undefined) return;
+        
+        // Indicar que se está arrastrando
+        isDragging = true;
+        
+        // Calcular el ángulo inicial
+        startAngle = calculateAngle(centerX, centerY, clientX, clientY);
+        
+        // Guardar la rotación actual
+        startRotation = currentRotation;
+        
+        // Resetear las muestras de arrastre
+        dragSamples = [];
+        lastDragTime = Date.now();
+        lastDragAngle = startAngle;
+        
+        // Desactivar la transición durante el arrastre
+        roulette.style.transition = 'none';
+        
+        // Cambiar el cursor
+        roulette.style.cursor = 'grabbing';
+        
+        // Añadir clase para indicar que se está arrastrando
+        roulette.classList.add('dragging');
+    };
+    
+    // Función para manejar el movimiento durante el arrastre
+    const handleDragMove = (e) => {
+        if (!isDragging || isSpinning) return;
+        
+        // Obtener las coordenadas del evento (táctil o ratón)
+        const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+        const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+        
+        if (clientX === undefined || clientY === undefined) return;
+        
+        // Calcular el ángulo actual
+        const currentAngle = calculateAngle(centerX, centerY, clientX, clientY);
+        
+        // Calcular la diferencia de ángulo
+        let angleDiff = currentAngle - startAngle;
+        
+        // Ajustar la rotación
+        currentRotation = startRotation + angleDiff;
+        roulette.style.transform = `rotate(${currentRotation}deg)`;
+        
+        // Calcular y guardar la velocidad de arrastre
+        const now = Date.now();
+        const timeDiff = now - lastDragTime;
+        
+        if (timeDiff > 20) { // Solo registrar cada 20ms para suavizar
+            // Calcular velocidad angular (grados por segundo)
+            const angleDelta = currentAngle - lastDragAngle;
+            const speed = angleDelta / (timeDiff / 1000);
+            
+            // Añadir a las muestras
+            dragSamples.push(speed);
+            if (dragSamples.length > maxSamples) {
+                dragSamples.shift();
+            }
+            
+            // Actualizar valores para la próxima muestra
+            lastDragTime = now;
+            lastDragAngle = currentAngle;
+        }
+    };
+    
+    // Función para manejar el fin del arrastre
+    const handleDragEnd = () => {
+        if (!isDragging || isSpinning) return;
+        
+        // Ya no se está arrastrando
+        isDragging = false;
+        
+        // Calcular la velocidad media de las últimas muestras
+        if (dragSamples.length > 0) {
+            dragSpeed = dragSamples.reduce((sum, speed) => sum + speed, 0) / dragSamples.length;
+            
+            // Si la velocidad es significativa, iniciar el giro
+            if (Math.abs(dragSpeed) > 20) {
+                // Convertir la velocidad angular a una medida que funcione con nuestro sistema de giro
+                // Factor de escala para convertir velocidad angular a "impulso" para el giro
+                const scaleFactor = 10;
+                const spinImpulse = dragSpeed * scaleFactor;
+                
+                // Iniciar el giro con la velocidad calculada
+                spinWithDragSpeed(spinImpulse);
+            }
+        }
+        
+        // Restaurar el cursor
+        roulette.style.cursor = 'grab';
+        
+        // Quitar clase de arrastre
+        roulette.classList.remove('dragging');
+    };
+    
+    // Registrar los eventos para ratón
+    roulette.addEventListener('mousedown', handleDragStart);
+    window.addEventListener('mousemove', handleDragMove);
+    window.addEventListener('mouseup', handleDragEnd);
+    
+    // Registrar los eventos para táctil
+    roulette.addEventListener('touchstart', handleDragStart, { passive: true });
+    window.addEventListener('touchmove', handleDragMove, { passive: true });
+    window.addEventListener('touchend', handleDragEnd);
+    
+    // Evitar el comportamiento predeterminado del navegador
+    roulette.addEventListener('dragstart', (e) => e.preventDefault());
+};
+
+// Mantener el botón de giro como una alternativa
+spinButton.addEventListener("click", () => {
+    if (isSpinning) return;
+    
+    // Generar un giro aleatorio
+    const spins = getRandomNumber(minSpins, maxSpins);
+    const degrees = getRandomNumber(minDegrees, maxDegrees);
+    const fullSpins = spins * 360;
+    const spin = currentRotation + fullSpins + degrees;
+    
+    // Actualizar la rotación actual
+    currentRotation = spin;
+    
+    // Calcular tiempo de animación
+    const animationTime = spins * 0.5 + 1;
+    
+    // Iniciar el giro
+    roulette.style.transition = `transform ${animationTime}s cubic-bezier(0.1, 0.7, 0.1, 1)`;
+    roulette.style.transform = `rotate(${spin}deg)`;
+    
+    // Reproducir sonido de ticking
+    sounds.playTicking();
+    
+    // Marcar como girando
+    isSpinning = true;
+    
+    // Cuando la animación termine
+    setTimeout(() => {
+        // Detener el sonido de ticking y reproducir el sonido de finalización
+        sounds.stopTicking();
+        
+        
+        // Determinar el premio ganador
+        const prizeName = determineWinner(spin);
+        
+
+        if (prizeName !== 'Siga participando') {
+            // Mostrar confeti
+            showConfetti();
+            // sonido de premiado
+            sounds.playFinish();
+        } else {
+            // sonido de derrota
+            sounds.playLosing();
+        }
         
         // Mostrar modal con el premio
         setTimeout(() => {
@@ -209,36 +434,10 @@ spinButton.addEventListener("click", () => {
     }, animationTime * 1000);
 });
 
-// Evento para resetear la ruleta
-resetButton.addEventListener("click", () => {
-    // Evitar resetear mientras está girando
-    if (isSpinning) return;
-    
-    // Resetear la ruleta con una animación más corta
-    roulette.style.transform = "rotate(0deg)";
-    roulette.style.transitionDuration = "1s";
-    
-    // Cambiar los botones
-    spinButton.style.display = "inline-block";
-    resetButton.style.display = "none";
-});
-
 // Añadir CSS para las nuevas funcionalidades
 const addStyles = () => {
     const styleEl = document.createElement('style');
     styleEl.textContent = `
-        /* Estilos para la animación de sacudida de la flecha */
-        @keyframes shake {
-            0% { transform: rotate(224deg); }
-            25% { transform: rotate(219deg); }
-            50% { transform: rotate(224deg); }
-            75% { transform: rotate(229deg); }
-            100% { transform: rotate(224deg); }
-        }
-        
-        .shake-animation {
-            animation: shake 0.5s ease-in-out;
-        }
         
         /* Estilos para el confeti */
         .confetti-container {
@@ -272,31 +471,6 @@ const addStyles = () => {
             }
         }
         
-        /* Estilos para el modal */
-        .winner-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 10000;
-        }
-        
-        .winner-modal-content {
-            background-color: white;
-            padding: 30px;
-            border-radius: 10px;
-            text-align: center;
-            position: relative;
-            width: 80%;
-            max-width: 400px;
-            animation: modalAppear 0.5s ease-out forwards;
-        }
-        
         @keyframes modalAppear {
             from {
                 transform: scale(0.5);
@@ -320,28 +494,73 @@ const addStyles = () => {
         #roulette {
             box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
             border: 10px solid #fff;
+            cursor: grab;
+            user-select: none;
+            touch-action: none;
         }
         
-        /* Estilos para los botones */
-        .button-container button {
-            transition: all 0.3s ease;
-            border-radius: 5px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        #roulette.dragging {
+            cursor: grabbing;
         }
         
-        .button-container button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+        /* Estilo para la flecha */
+        #arrow {
+            filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.7));
         }
         
-        .button-container button:active {
-            transform: translateY(1px);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        .show-indicator .drag-indicator {
+            opacity: 1;
         }
     `;
     
     document.head.appendChild(styleEl);
 };
 
-// Inicializar estilos adicionales
-addStyles();
+// Añadir un indicador para el arrastre (opcional)
+const addDragIndicator = () => {
+    const indicator = document.createElement('div');
+    indicator.className = 'drag-indicator';
+    indicator.textContent = '¡Arrastra para girar!';
+    
+    const container = document.querySelector('.roulette-container');
+    container.appendChild(indicator);
+    
+    // Mostrar el indicador brevemente cuando se carga la página
+    setTimeout(() => {
+        container.classList.add('show-indicator');
+        
+        setTimeout(() => {
+            container.classList.remove('show-indicator');
+        }, 3000);
+    }, 1000);
+    
+    // Mostrar el indicador cuando el usuario toque la ruleta pero no arrastre
+    let touchTimeout;
+    roulette.addEventListener('touchstart', () => {
+        touchTimeout = setTimeout(() => {
+            if (!isDragging) {
+                container.classList.add('show-indicator');
+                setTimeout(() => {
+                    container.classList.remove('show-indicator');
+                }, 2000);
+            }
+        }, 500);
+    });
+    
+    roulette.addEventListener('touchmove', () => {
+        clearTimeout(touchTimeout);
+    });
+};
+
+// Inicializar todo
+const init = () => {
+    addStyles();
+    initDragEvents();
+    addDragIndicator();
+    
+    // Hacer que la ruleta sea arrastrable desde el inicio
+    roulette.style.cursor = 'grab';
+};
+
+// Iniciar cuando la página esté cargada
+document.addEventListener('DOMContentLoaded', init);
